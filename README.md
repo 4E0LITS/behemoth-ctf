@@ -1,0 +1,1 @@
+My notes for the Behemoth ctf challenge on OTW. I have omitted all passwords for the levels. I've uploaded these here so that I won't lose them and as proof of concept. Please do not use these as reference for solving this challenge. You should solve the challenges entirely on your own. That's how you learn.

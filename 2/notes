@@ -1,0 +1,9 @@
+This is a weird program. First thing it does is get its own pid, then snprintf "touch %d" it into a buffer. This buffer
+is fed into a call to system(). After the system() call, sleep(2000) occurs, preventing us from conveniently seeing what
+happens next. This can easily be bypassed by using set to modify the value at the top of the stack and set it to 0. After
+the sleep occurs, a system() call is made to `cat` the same file being touched before. If this could be controlled, we could
+attempt to touch /etc/behemoth_pass/behemoth3 and then cat it...
+
+We can't change the format string that the snprintf uses, or even supply input to the program to change anything about how
+it seems to work. But we CAN write an exploit that determines PID, creates a link by the same name to our target, and makes
+an exec call to replace its image with this bin, which should attempt a cat call (heh) on the link, reading the file for us.

@@ -1,0 +1,2 @@
+This level seems fairly straightforward. Running the binary prompts you for a password. Disassembling main reveals a strcmp
+call, and some trivial memory inspection reveals that the user's input is compared to the stored password which can be read.

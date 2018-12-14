@@ -1,0 +1,20 @@
+Last one for behemoth. Let's see what it does in GDB.
+
+First thing it does is load a string, "LC_ALL=en_US.UTF-8", and find its length, then memset it all to 0s. It then does this
+with another string, and so on, zeroing out everything in environment variables so that we can't load any shellcode there.
+
+When it's done doing this, it proceeds to main + 109, so I'll just break there and hit c. After clearing env, it exits if we
+haven't supplied an argv[1], so we'll give it a junk value for now. This performs a strcpy of argv[1] into the stack, but
+first checks it for non alphanumeric characters and won't perform the dangerous copy if any are found. But, their intrusion
+detection is lazy, and they only check as much of the string as they're expecting to be able to cram into their buffer. So,
+we have several circumvention options.
+    1) store alphanumeric shellcode in the buffer and ret into it
+    2) store regular shellcode directly after the return address and ret directly forward (requires address bruteforce)
+    3) return into library
+    4) return oriented programming
+
+We could also store regular shellcode with a considerable NOP slide in argv[2] and jump directly into it, but this would
+feel cheap compared to the "intended" solutions, so we'll use a more complex attack. We can just return into libc's system()
+and drop a shell with
+
+    ./behemoth7 $(perl -e 'print "A" x 528 . "\x50\xc8\xe4\xf7" . "AAAA" . "\xc8\xec\xf6\xf7"')

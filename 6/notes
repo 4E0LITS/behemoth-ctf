@@ -1,0 +1,43 @@
+Two executables this time. behemoth6, which is setuid for behemoth7, and behemoth6_reader, which is owned by behemoth7 and
+executable by us but not setuid. We'll start by reverse engineering the setuid one.
+
+First thing it does is popen behemoth6_reader in read mode. To understand what's going to be coming out of the reader, we
+should switch gears and pull it apart before continuing.
+
+Looks like behemoth6_reader is expecting to be able to open a rather suspiciously named file called shellcode.txt. If this
+call fails, it'll jump to return and exit from there. For now we'll divert this to /tmp/AAA and fill that with some AAAAAAAA
+so it has something to work on. Once the reaer program has opened the file, it determines the size with fseek/ftell and
+mallocs for that size, then reads the file into the malloced buffer and closes the file. Once the file is closed, a little
+loop happens. A stack variable gets incremented and compared with the saved file length. If the incremented var is less,
+the program loads the char pointed at by (malloced + incremented) into eax and compares it with 0xb, vertical tab.
+
+If it doesn't encounter '\v', it will jump its execution into the malloced memory holding the contents of shellcode.txt.
+Let's look at the rest of behemoth6 next.
+
+behemoth6, after opening the pipe, mallocs 10 bytes and then freads(malloced, 10, 1, pipe). In my test, this read the
+string "Write your". It then strcmps whatever was read with "HelloKitty", and exits on not equal. It seems like we're 
+supposed to use shellcode to get behemoth6_reader to print "HelloKitty". Since I already have this /bin/cat shellcode
+ready, I'll have it cat a file that contains that test. Let's test behemoth6_reader with this shellcode and make sure it all
+works.
+
+    behemoth6@behemoth:/tmp$ printf "\x31\xc0\x50\x68\x2f\x63\x61\x74\x68\x2f\x62\x69\x6e\x89\xe3\x50\x68\x2f\x68\x61\x78\x68\x2f\x74\x6d\x70\x89\xe2\x50\x52\x53\x89\xe1\x50\x89\xe2\xb0\x0b\xcd\x80" > shellcode.txt
+    behemoth6@behemoth:/tmp$ printf "HelloKitty" > /tmp/hax
+    behemoth6@behemoth:/tmp$ chmod +r /tmp/hax
+    behemoth6@behemoth:/tmp$ /behemoth/behemoth6_reader
+    Write your own shellcode.
+
+Seems like our payload isn't going off properly. Guess we'll have to debug it.
+
+So, our shellcode actually does have an 0x0b byte, which means that instead of proceeding to the call which will execute it,
+the reader bin prints out the static string "Write your own shellcode." and exits. It looks like the game authors wanted to
+keep skids from ripping payloads off shell-storm and implemented a skid detector. Since 0xb is the syscall number for execve,
+just about all general use shellcode that one might find useful in a bin exploitation CTF will contain it. I'm a bit
+offended that the game thinks I didn't write the shellcode I'm using, but it's a simple fix workaround. This shellcode
+contains the instruction `mov al, 0xb` to load the syscall number that I want. I can swap it with `mov al, 0xf4 \n xor al,
+0xff` to create the 0xb byte in memory without having to actually have it in my shellcode.
+
+    behemoth6@behemoth:/tmp$ echo $(/behemoth/behemoth6_reader)
+    HelloKitty
+
+Get fucked, skid detector. Take your false positives elsewhere. If our shellcode produces the expected output of
+"HelloKitty", the setuid bin calls setreuid and drops us a shell, so all we need to do to win now is run it.

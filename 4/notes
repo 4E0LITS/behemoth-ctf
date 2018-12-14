@@ -1,0 +1,14 @@
+Running this binary says "PID not found!" and quits. Let's open this in GDB and see what's up.
+
+The binary gets its PID and sprintfs it into a buffer to read "/tmp/$PID". This is plugged into a call to fopen() with mode
+"r". If this call fails, the program prints the not found message and exits. To figure out what else is happening, we need
+to predict the PID and create an entry in /tmp/ for it. we'll eventually want an exploit.c that gets its PID, touches 
+creates /tmp/$PID, and execl()s behemoth4. Until we need it though, we can use /tmp/123 and just sub it into eax after
+getpid so that we can see what the rest of the program does.
+
+Having obtained a FILE* from fopen for /tmp/123, the program sleeps for one second. It then enters a loop that appears to
+fgetc characters from the file and print them out. this is starting to look like a throwback to level 2. Could it be all we
+need to do is control PID and point this program at a link to /etc/behemoth_pass/behemoth5?
+
+As it turns out, yes. We can literally recycle the same exploit.c from level 2. All we needed to do was change the file
+names. WTF?! Well, free win I guess. I'll take it.

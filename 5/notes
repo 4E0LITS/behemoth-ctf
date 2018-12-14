@@ -1,0 +1,15 @@
+This program quits when we open it, with no error message. Disassemblying main in GDB reveals a whole host of file stuffs
+such as fopen, fseek, and ftell. Immediately following is a call to malloc, then fgets. I'm betting that this determines the
+number of chars in the first line of the file, mallocs for it, and reads it into the heap. After this there's some weird
+calls involving gethostbyname, sockets, and common conversions in networking like atoi and htons. Let's see what file it's
+messing with first.
+
+Looks like it's hardcoded to open /etc/behemoth_pass/behemoth6. We don't have to coerce it into opening what we want, but
+we do need it to open something we control if we're going to debug it further, so we'll have it open behemoth5 instead by
+changing the last character.
+
+As expected, the program mallocs 11 characters and writes the content of /etc/behemoth_pass/behemoth5 into this buffer. A
+socket is created with the arguments (2, 2, 0), or (AF_INET, SOCK_DGRAM, 0). gethostbyname is called on a hardcoded value
+of "localhost". atoi gets called on "1337" and feeds the resulting 1337 into htons. The next call is a sendto() which sends
+the content of the file it read before over the socket. Creating a simple UDP listener in python lets us read what it has to
+say.

